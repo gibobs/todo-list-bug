@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Task } from '../entities/task.entity';
 import { Repository } from 'typeorm';
@@ -23,7 +23,7 @@ export class TasksService {
         });
 
         if (!task) {
-            throw new NotFoundException([
+            throw new ForbiddenException([
                 'Task not found or you do not have permission to view it',
             ]);
         }
@@ -35,7 +35,7 @@ export class TasksService {
         const task = await this.getTask(taskData.id, userId);
 
         if (!task) {
-            throw new NotFoundException([
+            throw new ForbiddenException([
                 'Task not found or you do not have permission to edit it',
             ]);
         }
