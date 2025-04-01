@@ -64,3 +64,17 @@ Sigue estos pasos para levantar el proyecto y trabajar en las correcciones neces
 ---
 
 ¡Listo! Ahora puedes empezar a trabajar en los errores y enviar tu contribución para asegurar que la aplicación funcione correctamente y sin vulnerabilidades.
+
+
+---
+# Respuesta por Fernando Valero
+
+## Problemas de seguridad encontrados:
+
+- No se verifica la propiedad del usuario en las operaciones sobre tareas
+- Vulnerabilidad de inyección SQL en las consultas de tareas
+- Faltan protecciones de autenticación en los endpoints de tareas
+- No hay validación de entradas al editar tareas
+- No se maneja el error de acceso no autorizado
+- No hay definiciones de tipo adecuadas para los cuerpos de las solicitudes
+
