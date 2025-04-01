@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Task } from '../entities/task.entity';
 import { Repository } from 'typeorm';
@@ -10,26 +10,44 @@ export class TasksService {
         private readonly tasksRepository: Repository<Task>,
     ) {}
 
-    async listTasks() {
-        const tasks = await this.tasksRepository.find();
-
+    async listTasks(userId: string) {
+        const tasks = await this.tasksRepository.find({
+            where: { owner: { id: userId } },
+        });
         return tasks;
     }
 
-    async getTask(id: string) {
+    async getTask(id: string, userId: string) {
         const task = await this.tasksRepository
             .createQueryBuilder('task')
-            .where(`task.id = "${id}"`)
+            .where('task.owner.id = :userId', { userId })
+            .andWhere('task.id = :id', { id })
             .getOne();
+
+        if (!task) {
+            throw new ForbiddenException([
+                'Task not found or you do not have permission to view it',
+            ]);
+        }
 
         return task;
     }
 
-    async editTask(body: any) {
-        await this.tasksRepository.update(body.id, body);
+    async editTask(taskData: any, userId: string) {
+        const task = await this.tasksRepository
+            .createQueryBuilder()
+            .update(Task)
+            .set(taskData)
+            .where('ownerId = :userId', { userId }) // Usa el nombre real de la columna en la base de datos
+            .andWhere('id = :id', { id: taskData.id }) // Usa el nombre real de la columna
+            .execute();
 
-        const editedTask = await this.getTask(body.id);
+        if (task.affected === 0) {
+            throw new ForbiddenException([
+                'Task not found or you do not have permission to edit it',
+            ]);
+        }
 
-        return editedTask;
+        return { ...taskData, id: taskData.id };
     }
 }

@@ -16,12 +16,12 @@ export class AuthService {
 
         if (!user) {
             this.logger.log(`User with email ${email} not found`);
-            throw new UnauthorizedException();
+            throw new UnauthorizedException(['user or pass incorrect']);
         }
 
         if (user?.pass !== pass) {
             this.logger.log(`Invalid password for user with email ${email}`);
-            throw new UnauthorizedException();
+            throw new UnauthorizedException(['user or pass incorrect']);
         }
 
         const payload = { id: user.id, email: user.email };
