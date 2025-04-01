@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Task } from '../entities/task.entity';
 import { Repository } from 'typeorm';
+import { EditTaskDto } from './tasks.dto';
 
 @Injectable()
 export class TasksService {
@@ -29,7 +30,7 @@ export class TasksService {
         return task;
     }
 
-    async editTask(body: any, userId: string) {
+    async editTask(body: EditTaskDto, userId: string) {
         const task = await this.getTask(body.id, userId);
         if (!task) {
             throw new Error(
