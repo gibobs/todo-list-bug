@@ -10,26 +10,35 @@ export class TasksService {
         private readonly tasksRepository: Repository<Task>,
     ) {}
 
-    async listTasks() {
-        const tasks = await this.tasksRepository.find();
+    async listTasks(userId: string) {
+        const tasks = await this.tasksRepository
+            .createQueryBuilder('task')
+            .where('task.ownerId = :ownerId', { ownerId: userId })
+            .getMany();
 
         return tasks;
     }
 
-    async getTask(id: string) {
+    async getTask(id: string, userId: string) {
         const task = await this.tasksRepository
             .createQueryBuilder('task')
-            .where(`task.id = "${id}"`)
+            .where('task.id = :id', { id })
+            .andWhere('task.ownerId = :ownerId', { ownerId: userId })
             .getOne();
 
         return task;
     }
 
-    async editTask(body: any) {
+    async editTask(body: any, userId: string) {
+        const task = await this.getTask(body.id, userId);
+        if (!task) {
+            throw new Error(
+                'Task not found or you do not have permission to edit it.',
+            );
+        }
+
         await this.tasksRepository.update(body.id, body);
 
-        const editedTask = await this.getTask(body.id);
-
-        return editedTask;
+        return this.getTask(body.id, userId);
     }
 }
