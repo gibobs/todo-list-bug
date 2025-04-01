@@ -18,9 +18,11 @@ export class TasksService {
     }
 
     async getTask(id: string, userId: string) {
-        const task = await this.tasksRepository.findOne({
-            where: { id, owner: { id: userId } },
-        });
+        const task = await this.tasksRepository
+            .createQueryBuilder('task')
+            .where('task.owner.id = :userId', { userId })
+            .andWhere('task.id = :id', { id })
+            .getOne();
 
         if (!task) {
             throw new ForbiddenException([
@@ -32,15 +34,20 @@ export class TasksService {
     }
 
     async editTask(taskData: any, userId: string) {
-        const task = await this.getTask(taskData.id, userId);
+        const task = await this.tasksRepository
+            .createQueryBuilder()
+            .update(Task)
+            .set(taskData)
+            .where('ownerId = :userId', { userId }) // Usa el nombre real de la columna en la base de datos
+            .andWhere('id = :id', { id: taskData.id }) // Usa el nombre real de la columna
+            .execute();
 
-        if (!task) {
+        if (task.affected === 0) {
             throw new ForbiddenException([
                 'Task not found or you do not have permission to edit it',
             ]);
         }
 
-        await this.tasksRepository.update(taskData.id, taskData);
-        return this.getTask(taskData.id, userId);
+        return { ...taskData, id: taskData.id };
     }
 }
