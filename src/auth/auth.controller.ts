@@ -1,6 +1,14 @@
-import { Body, Controller, HttpCode, HttpStatus, Post } from '@nestjs/common';
+import {
+    Body,
+    Controller,
+    HttpCode,
+    HttpStatus,
+    Post,
+    ValidationPipe,
+} from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { IsPublic } from './is-public.decorator';
+import { SignInDto } from './dto/singin.dto';
 
 @Controller('auth')
 export class AuthController {
@@ -9,7 +17,7 @@ export class AuthController {
     @IsPublic()
     @HttpCode(HttpStatus.OK)
     @Post('login')
-    signIn(@Body() signInDto: any) {
+    signIn(@Body(ValidationPipe) signInDto: SignInDto) {
         return this.authService.signIn(signInDto.email, signInDto.pass);
     }
 }
