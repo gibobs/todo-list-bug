@@ -11,7 +11,7 @@ export class TasksService {
     ) {}
 
     async listTasks() {
-        const tasks = await this.tasksRepository.find();
+        const tasks = await this.tasksRepository.find()
 
         return tasks;
     }
