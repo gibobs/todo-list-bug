@@ -7,6 +7,7 @@ import {
 import { Repository } from 'typeorm';
 import { User } from '../entities/user.entity';
 import { InjectRepository } from '@nestjs/typeorm';
+import * as bcrypt from 'bcrypt';
 
 @Injectable()
 export class UsersService {
@@ -52,5 +53,91 @@ export class UsersService {
         }
         // Devolvemos el usuario encontrado
         return user;
+    }
+
+    async updateMe(previousEmail: string, newBody: any) {
+        //comprobamsos que el email no sea nulo
+        if (!previousEmail) {
+            throw new BadRequestException(
+                'Previous email is required to update the user.',
+            );
+        }
+
+        //buscamos al usuario en la base de datos
+        const user = await this.usersRepository.findOneBy({
+            email: previousEmail,
+        });
+        //verificamos si el usuario existe
+        if (!user) {
+            throw new NotFoundException(
+                'User not found with the provided email address.',
+            );
+        }
+
+        // Actualizamos solo los campos proporcionados
+        if (newBody.email) {
+            user.email = newBody.email;
+        }
+        if (newBody.password) {
+            // Encripta la contraseña antes de guardarla
+            const salt = await bcrypt.genSalt();
+            user.pass = await bcrypt.hash(newBody.password, salt);
+        }
+        if (newBody.fullname) {
+            user.fullname = newBody.fullname;
+        }
+
+        // Guardamos los cambios en la base de datos
+        const updatedUser = await this.usersRepository.save(user);
+        return updatedUser;
+    }
+
+    async deleteMe(email: string) {
+        try {
+            //validamos que el email no sea nulo
+            if (!email) {
+                return {
+                    error: 'Invalid Email',
+                    message: 'Email is required to find you.',
+                };
+            }
+            //buscamos al usuario en la base de datos
+            const user = await this.usersRepository.findOneBy({ email });
+            //verificamos si el usuario existe
+            if (!user) {
+                return {
+                    error: 'User not found',
+                    message: 'User not found',
+                };
+            }
+            //eliminamos al usuario
+            await this.usersRepository.delete({ email });
+            this.logger.log(`User with email ${email} deleted successfully.`);
+            // Verificamos si el usuario sigue existiendo
+            const userAfterDelete = await this.usersRepository.findOneBy({
+                email,
+            });
+
+            if (userAfterDelete) {
+                this.logger.error(
+                    `User still exists after delete: ${JSON.stringify(userAfterDelete)}`,
+                );
+                return {
+                    error: 'Deletion Failed',
+                    message: 'The user could not be deleted. Please try again.',
+                };
+            }
+            return {
+                status: 'success',
+                message: 'User deleted successfully',
+            };
+        } catch (error) {
+            this.logger.error('Error deleting user:', error);
+            return {
+                error: 'Error deleting user',
+                message:
+                    'An unexpected error occurred while deleting the user.',
+            };
+        }
     }
 }

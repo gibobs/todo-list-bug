@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Task } from '../entities/task.entity';
-import { Repository } from 'typeorm';
+import { Equal, Repository } from 'typeorm';
 
 @Injectable()
 export class TasksService {
@@ -9,11 +9,12 @@ export class TasksService {
         @InjectRepository(Task)
         private readonly tasksRepository: Repository<Task>,
     ) {}
-
-    async listTasks() {
-        const tasks = await this.tasksRepository.find()
-
-        return tasks;
+    //**************** */
+    async listTasks(userId: string) {
+        // Filtramos las tareas por el ID del usuario (owner)
+        return this.tasksRepository.find({
+            where: { owner: Equal(userId) },
+        });
     }
 
     async getTask(id: string) {

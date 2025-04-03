@@ -19,5 +19,5 @@ export class Task {
     dueDate: string;
 
     @ManyToOne(() => User, (user) => user.tasks)
-        owner: User;
+    owner: User;
 }
