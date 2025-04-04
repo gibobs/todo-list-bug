@@ -1,4 +1,15 @@
-import { Body, Controller, Delete, Post, Put, UseGuards } from '@nestjs/common';
+import {
+    BadRequestException,
+    Body,
+    ConflictException,
+    Controller,
+    Delete,
+    InternalServerErrorException,
+    NotFoundException,
+    Post,
+    Put,
+    UseGuards,
+} from '@nestjs/common';
 import { AuthGuard } from 'src/auth/auth.guard';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './create-user-dto';
@@ -8,44 +19,81 @@ import { UpdateUserDto } from './update-user-dto';
 export class UsersController {
     constructor(private readonly usersService: UsersService) {}
 
+    //****************************************** */
+
     @Post('/create')
     async create(@Body() body: CreateUserDto) {
-        //validamos la entrada de datos
         try {
-            //invocamos el servicio para crear usuarios
-            return await this.usersService.create(body);
-        } catch (_error) {
+            // Validamos que el cuerpo de la solicitud no esté vacío
+            if (!body || !body.email) {
+                throw new BadRequestException(
+                    'Request body or email is required.',
+                );
+            }
+
+            // Invocamos el servicio para crear el usuario
+            const newUser = await this.usersService.create(body);
+
+            // Devolvemos una respuesta exitosa
             return {
-                error: 'User already exists',
-                message:
-                    'The email address provided is already associated with an existing account. Please use a different email.',
+                statusCode: 201,
+                data: newUser,
+                message: 'User created successfully.',
             };
+        } catch (error) {
+            console.error('Error creating user:', error);
+
+            // Si  usuario ya existe en la bdd
+            if (error.message === 'User already exists') {
+                throw new ConflictException(
+                    'The email address provided is already associated with an existing account. Please use a different email.',
+                );
+            }
+
+            // Para otros errores, lanzamos una excepción genérica
+            throw new InternalServerErrorException(
+                'An unexpected error occurred while creating the user. Try again lster, please.',
+            );
         }
     }
-
     //****************************************** */
     /// controlador que mostrará los datos del propio usuario
-    // encontrará un usuario a través del email
+    // a través del email
+    //útil como consulta del propio usuario
     @Post('/find-me')
     //he preferido usar un método POST para evitar problemas de caché
     @UseGuards(AuthGuard)
     async findMe(@Body('email') email: string) {
-        //comprobamos que el email sea correcto
-        if (!email) {
-            return {
-                error: 'Invalid Email',
-                message: 'Email is required to find you.',
-            };
-        }
         try {
-            //invocamos el servicio para buscar usuario q
-            return await this.usersService.findOne(email);
-        } catch (_error) {
+            //comprobamos que el email sea correcto
+            if (!email) {
+                throw new BadRequestException(
+                    'Request email is required. Try again, please.',
+                );
+            }
+
+            //invocamos el servicio para buscar usuario
+            const youFindMe = await this.usersService.findOne(email);
+
+            // Verificamos si el usuario existe
+            if (!youFindMe) {
+                throw new NotFoundException(
+                    'User with the provided email was not found.',
+                );
+            }
+
+            // Devolvemos una respuesta exitosa
             return {
-                error: 'Error finding user',
-                message:
-                    'An unexpected error occurred. Please try again later.',
+                status: 'success',
+                data: youFindMe,
+                message: 'User found successfully.',
             };
+        } catch (error) {
+            console.error('Error finding user:', error);
+
+            throw new InternalServerErrorException(
+                'An unexpected error occurred. Please try again later.',
+            );
         }
     }
     //************************************************* */
@@ -60,11 +108,9 @@ export class UsersController {
         try {
             //validamos que los datos no sean nulos
             if (!newBody || !previousEmail) {
-                return {
-                    error: 'Invalid Input',
-                    message:
-                        'Both user data and previous email are required to update.',
-                };
+                throw new BadRequestException(
+                    'Request email and new data are required. Try again, please.',
+                );
             }
 
             // Invocamos el servicio para actualizar el usuario
@@ -72,39 +118,40 @@ export class UsersController {
                 previousEmail,
                 newBody,
             );
+            // Devolvemos una respuesta exitosa
+
             return {
                 status: 'success',
                 data: updatedUser,
+                message: 'User datsa updated successfully.',
             };
         } catch (error) {
             console.error('Error updating user:', error);
-            return {
-                error: 'Error Updating User',
-                message:
-                    'An unexpected error occurred while updating the user. Please try again later.',
-            };
+
+            throw new InternalServerErrorException(
+                'An unexpected error occurred. Please try again later.',
+            );
         }
     }
-
+    //************************************************* */
+    /// controlador para eliminar al usuario
+    //  a través del email
     @Delete('/delete-me')
     @UseGuards(AuthGuard)
     async deleteMe(@Body('email') email: string) {
         //validamos que el email no sea nulo
         if (!email) {
-            return {
-                error: 'Invalid Email',
-                message: 'Email is required to find you.',
-            };
+            throw new BadRequestException(
+                'Request email is required. Try again, please.',
+            );
         }
         try {
             //invocamos el servicio para eliminar al usuario
             return await this.usersService.deleteMe(email);
         } catch (_error) {
-            return {
-                error: 'Error deleting user. Try again please',
-                message:
-                    'An unexpected error occurred. Please try again later.',
-            };
+            throw new InternalServerErrorException(
+                'An unexpected error occurred. Please try again later.',
+            );
         }
     }
 }
