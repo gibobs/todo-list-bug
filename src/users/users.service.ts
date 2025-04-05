@@ -62,6 +62,11 @@ export class UsersService {
                 'Previous email is required to update the user.',
             );
         }
+        if (!newBody) {
+            throw new BadRequestException(
+                'New body is required to update the user.',
+            );
+        }
 
         //buscamos al usuario en la base de datos
         const user = await this.usersRepository.findOneBy({
@@ -107,7 +112,9 @@ export class UsersService {
             if (!user) {
                 return {
                     error: 'User not found',
-                    message: 'User not found',
+                    statusCode: 404,
+                    message:
+                        'No user found with the provided email address. Try again please.',
                 };
             }
             //eliminamos al usuario

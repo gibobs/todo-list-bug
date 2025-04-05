@@ -1,4 +1,5 @@
 import {
+    BadRequestException,
     ForbiddenException,
     Injectable,
     NotFoundException,
@@ -14,14 +15,16 @@ export class TasksService {
         @InjectRepository(Task)
         private readonly tasksRepository: Repository<Task>,
     ) {}
+
     //**************** */
+    // Método para obtener la lista de tareas de un usuario
     async listTasks(userId: string) {
-        //añadido try-catch
         try {
-            // Validamos que el ID del usuario no esté vacío
+            // Validamos que el ID del usuario no sea nulo
             if (!userId) {
-                throw new Error('User ID is required.');
+                throw new NotFoundException('User ID is required.');
             }
+
             // Filtramos las tareas por el ID del usuario (owner)
             return this.tasksRepository.find({
                 where: { owner: Equal(userId) },
@@ -35,107 +38,229 @@ export class TasksService {
     }
 
     //**************** */
-    // Método para consigue una tarea por su ID
-    async getTask(id: string) {
-        if (!id) {
-            throw new Error('Task ID is required.');
+    // Método para conseguir una tarea por su ID
+    async getTask(taskId: string, userId: string) {
+        try {
+            // Validamos la propiedad de la tarea
+            const isAuthorized = await this.userTasksValidate(taskId, userId);
+
+            if (isAuthorized == true) {
+                console.log('User is authorized to access this task.');
+
+                // Buscamos y devolvemos la tarea
+                const task = await this.tasksRepository.findOne({
+                    where: { id: taskId },
+                    relations: ['owner'],
+                });
+
+                //validamos que se haya encontrado la tarea
+                if (!task) {
+                    throw new NotFoundException('Task not found.');
+                }
+
+                return {
+                    status: 'success',
+                    data: task,
+                    message: 'We found your task successfully.',
+                };
+
+                //si el propietario no es el mismo que el del id de la tarea
+            } else {
+                console.log('User is not authorized to access this task.');
+                throw new ForbiddenException(
+                    'You are not authorized to access this task.',
+                );
+            }
+        } catch (error) {
+            console.error('Error retrieving task:', error);
+            // Si el error es una excepción conocida, la relanzamos
+            if (
+                error instanceof NotFoundException ||
+                error instanceof ForbiddenException
+            ) {
+                throw error;
+            }
+
+            // Para otros errores, lanzamos una excepción genérica
+            throw new Error(
+                'An unexpected error occurred while retrieving the task.',
+            );
         }
-        // Buscamos la tarea por su ID
-        const task = await this.tasksRepository
-            .createQueryBuilder('task')
-            .where(`task.id = "${id}"`)
-            .getOne();
-        if (!task) {
-            throw new Error('Task not found.');
+    }
+
+    //**************** */
+    // Método que edita el contenido de una tarea de un propietario
+    async editTask(
+        taskId: string,
+        userId: string,
+        updateData: any,
+    ): Promise<Task> {
+        try {
+            // Validamos la propiedad de la tarea
+            const isAuthorized = await this.userTasksValidate(taskId, userId);
+
+            // Validamos que el cuerpo de la solicitud contenga datos para actualizar
+            if (!updateData || Object.keys(updateData).length === 0) {
+                throw new BadRequestException(
+                    'Update data is required. Empty updates are not allowed.',
+                );
+            }
+
+            // Validamos que los campos no estén vacíos
+            if (
+                ('title' in updateData && updateData.title.trim() === '') ||
+                ('description' in updateData &&
+                    updateData.description.trim() === '')
+            ) {
+                throw new BadRequestException(
+                    'Fields cannot be empty. Please provide valid data.',
+                );
+            }
+            if (isAuthorized == true) {
+                console.log('User is authorized to access this task.');
+
+                // Buscamos y devolvemos la tarea
+                const task = await this.tasksRepository.findOne({
+                    where: { id: taskId },
+                    relations: ['owner'],
+                });
+
+                //validamos que se haya encontrado la tarea
+                if (!task) {
+                    throw new NotFoundException('Task not found.');
+                }
+
+                // Actualizamos la tarea con los datos proporcionados
+                await this.tasksRepository.update(taskId, updateData);
+
+                // Devolvemos la tarea actualizada
+                const updatedTask = await this.tasksRepository.findOne({
+                    where: { id: taskId },
+                    relations: ['owner'],
+                });
+
+                return updatedTask;
+
+                //si el propietario no es el mismo que el del id de la tarea
+            } else {
+                console.log('User is not authorized to access this task.');
+                throw new ForbiddenException(
+                    'You are not authorized to access this task.',
+                );
+            }
+        } catch (error) {
+            console.error('Error retrieving task:', error);
+
+            // Si el error es una excepción conocida, la relanzamos
+            if (
+                error instanceof NotFoundException ||
+                error instanceof ForbiddenException ||
+                error instanceof BadRequestException
+            ) {
+                throw error;
+            }
+            // Para otros errores, lanzamos una excepción genérica
+            throw new Error(
+                'An unexpected error occurred while retrieving the task.',
+            );
         }
-        // Devolvemos la tarea encontrada
-        return task;
     }
+
     //**************** */
-
-    async editTask(body: any) {
-        await this.tasksRepository.update(body.id, body);
-
-        const editedTask = await this.getTask(body.id);
-
-        return editedTask;
-    }
-    //**************** */
-    // Método para eliminar una tarea por su ID
+    // Método para eliminar una tarea por su ID siempre por el propietario
     async deleteTask(taskId: string, userId: string): Promise<Task> {
-        // Verificamos la propiedad de la tarea
-        const task = await this.userTasksValidate(taskId, userId);
+        try {
+            // Validamos la propiedad de la tarea
+            const isAuthorized = await this.userTasksValidate(taskId, userId);
 
-        // Eliminamos la tarea
-        await this.tasksRepository.delete(taskId);
+            if (isAuthorized == true) {
+                console.log('User is authorized to access this task.');
 
-        // Devolvemos la tarea eliminada
-        return task;
+                // Buscamos la tarea antes de eliminarla
+                const task = await this.tasksRepository.findOne({
+                    where: { id: taskId },
+                });
+
+                if (!task) {
+                    throw new NotFoundException('Task not found.');
+                }
+
+                // Eliminamos la tarea
+                await this.tasksRepository.delete(taskId);
+
+                console.log('Task deleted successfully.');
+
+                return task;
+            } else {
+                console.log('User is not authorized to access this task.');
+                throw new ForbiddenException(
+                    'You are not authorized to access this task.',
+                );
+            }
+        } catch (error) {
+            console.error('Error deleting task:', error);
+
+            // Para otros errores, lanzamos una excepción genérica
+            throw new Error(
+                'An unexpected error occurred while deleting the task.',
+            );
+        }
     }
-    //********************* */
-    // Método para validar la propiedad de una tarea
-    // y el usuario autenticado
-    async userTasksValidate(taskId: string, userId: string) {
-        // Validamos que el ID de la tarea no esté vacío
+
+    //**************** */
+    // Método para validar la propiedad de una tarea y el usuario autenticado
+    async userTasksValidate(taskId: string, userId: string): Promise<boolean> {
         if (!taskId) {
             throw new NotFoundException('Task ID is required.');
         }
 
-        // Buscamos la tarea por su ID
-        const task = await this.getTask(taskId);
-
-        // Verificamos si la tarea existe
-        if (!task) {
-            throw new NotFoundException('Task not found.');
-        }
         if (!userId) {
             throw new NotFoundException('User ID is required.');
         }
+
+        // Buscamos la tarea por su ID
+        const task = await this.tasksRepository.findOne({
+            where: { id: taskId },
+            relations: ['owner'], // Incluimos la relación con el propietario
+        });
+
+        if (!task) {
+            throw new NotFoundException('Task not found.');
+        }
+
         // Verificamos que el usuario autenticado sea el propietario de la tarea
         if (task.owner.id !== userId) {
             throw new ForbiddenException(
                 'You are not authorized to perform this action on this task.',
             );
         }
-        return task;
+
+        return true;
     }
- /*   async createTask(body: CreateTasksDto, userId: string): Promise<Task> {
-        try {
-            // Validamos que el ID del usuario no esté vacío
-            if (!userId) {
-                throw new NotFoundException('User ID is required.');
-            }
-    
-            // Validamos que el cuerpo de la solicitud no esté vacío
-            if (!body || !body.title || !body.dueDate) {
-                throw new BadRequestException(
-                    'Request body, title, and due date are required.',
-                );
-            }
-    
-            // Creamos la nueva tarea
-            const newTask = this.tasksRepository.create({
-                title: body.title,
-                description: body.description,
-                done: body.done || false, // Por defecto, la tarea no está completada
-                dueDate: body.dueDate,
-                owner: { id: userId }, // Asociamos la tarea al usuario autenticado
-            });
-    
-            // Guardamos la tarea en la base de datos
-            return await this.tasksRepository.save(newTask);
-        } catch (error) {
-            console.error('Error creating task:', error);
-    
-            // Manejo de errores específicos
-            if (error instanceof BadRequestException || error instanceof NotFoundException) {
-                throw error;
-            }
-    
-            // Lanzamos una excepción genérica para errores inesperados
-            throw new InternalServerErrorException(
-                'An unexpected error occurred while creating the task. Please try again later.',
-            );
-        }
-    }*/
+
+    // //***MÉTODOS PENDIENTES DE IMPLANTAR */
+    /////////////////////////////////////////////////////////////////
+    //**************** */
+    createNewTask() {
+        throw new Error('Method not implemented.');
+    }
+    updateTaskStatus() {
+        throw new Error('Method not implemented.');
+    }
+
+    getPendingTasks() {
+        throw new Error('Method not implemented.');
+    }
+
+    getCompletedTasks() {
+        throw new Error('Method not implemented.');
+    }
+
+    searchTasks() {
+        throw new Error('Method not implemented.');
+    }
+
+    taskIsDone() {
+        throw new Error('Method not implemented.');
+    }
 }

@@ -91,6 +91,13 @@ export class UsersController {
         } catch (error) {
             console.error('Error finding user:', error);
 
+            // Si el error es una excepción conocida, la relanzamos
+            if (
+                error instanceof NotFoundException ||
+                error instanceof BadRequestException
+            ) {
+                throw error;
+            }
             throw new InternalServerErrorException(
                 'An unexpected error occurred. Please try again later.',
             );
@@ -112,6 +119,16 @@ export class UsersController {
                     'Request email and new data are required. Try again, please.',
                 );
             }
+            // Validamos que los datos no sean nulos
+            if (
+                !newBody ||
+                Object.keys(newBody).length === 0 ||
+                !previousEmail
+            ) {
+                throw new BadRequestException(
+                    'Request email and new data are required. Try again, please.',
+                );
+            }
 
             // Invocamos el servicio para actualizar el usuario
             const updatedUser = await this.usersService.updateMe(
@@ -128,6 +145,13 @@ export class UsersController {
         } catch (error) {
             console.error('Error updating user:', error);
 
+            // Si el error es una excepción conocida, la relanzamos
+            if (
+                error instanceof NotFoundException ||
+                error instanceof BadRequestException
+            ) {
+                throw error;
+            }
             throw new InternalServerErrorException(
                 'An unexpected error occurred. Please try again later.',
             );
