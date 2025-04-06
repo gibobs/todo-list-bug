@@ -200,10 +200,13 @@ export class TasksService {
         } catch (error) {
             console.error('Error deleting task:', error);
 
-            // Para otros errores, lanzamos una excepción genérica
-            throw new Error(
-                'An unexpected error occurred while deleting the task.',
-            );
+            // Si el error es una excepción conocida, la relanzamos
+            if (
+                error instanceof NotFoundException ||
+                error instanceof ForbiddenException
+            ) {
+                throw error;
+            }
         }
     }
 
